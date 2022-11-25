@@ -1,0 +1,73 @@
+clear all 
+close all
+clc
+
+%需要手动调节的参数：
+T = [21 20 25 22 17  3 15 27];
+K = [ 3  7  5  9  7  2 10 18];
+f_s = 2e5; % 初值不要设太低
+df_s = 3e4; % 增量可以小些
+n_0 = 1e-5;
+if_tail = 1; % 收尾
+
+% 绘图相关、控制运算量等超参数
+n = 2000;
+points = 41;
+avertime = 5;
+bitnum = 3;
+
+% 参数、变量自动初始化
+epoch = length(T);
+mode = bitnum - 1;
+info = rand(1, n)<.5;
+errates = zeros(epoch,points);
+wordErrates = zeros(epoch,points);
+bitstream_in = Convol_Code(info, mode, if_tail);
+Ebn0  = zeros(1,points);
+
+
+for ii = 1:points
+    f_s = f_s + df_s;
+    % f_s = f_s*2;
+    for jj = 1:avertime
+        for e = 1:epoch
+            [recv_sign,E_b,input_signal,output_signal] = complex_bsc_channel(bitstream_in, bitnum, T(e), K(e), f_s,n_0);
+            judge_out = judging(recv_sign,bitnum,bitstream_in,1);
+            info_decode2 = Convol_DecodePro(judge_out, mode);
+            errates(e,ii) = errates(e,ii) + sum(abs(info_decode2(1:n)-info))/n;
+            wordErrates(e,ii) = wordErrates(e,ii) + WordError(info,info_decode2(1:n));
+            if ii == 40 & jj == 2
+                figure;
+                plot(info~=info_decode2(1:n));
+                b = 1;
+            end
+         end
+    end
+    Ebn0(ii) = E_b/n_0;
+end
+
+% T = [21 20 25 22 17];
+% K = [ 3  7  5  9  7];
+figure;
+plot(Ebn0, errates(1,:)/avertime, LineWidth = 1.5); 
+for i = 2:epoch
+    hold on 
+    plot(Ebn0, errates(i,:)/avertime, LineWidth = 1.5); 
+end
+xlabel("E_b/n_0");
+ylabel("误码率");
+
+legend("T=21,K=3","T=20,K=7","T=25,K=5","T=22,K=9","T=17,K=7","T=3,K=2","T=15,K=10");
+title("误码率：3bit映射1/3效率/收尾/软判");
+
+figure;
+plot(Ebn0, wordErrates(1,:)/avertime, LineWidth = 1.5); 
+for i = 2:epoch
+    hold on 
+    plot(Ebn0, wordErrates(i,:)/avertime, LineWidth = 1.5); 
+end
+xlabel("E_b/n_0");
+ylabel("误字率");
+legend("T=21,K=3","T=20,K=7","T=25,K=5","T=22,K=9","T=17,K=7","T=3,K=2","T=15,K=10");
+title("误字率：3bit映射1/3效率/收尾/软判 ");
+
